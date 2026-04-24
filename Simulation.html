@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulation: Abgedämpfte Schwingung & Kreisprojektion</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            max-width: 900px;
+            width: 100%;
+        }
+        h1 { color: #2c3e50; text-align: center; margin-top: 0; }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .control-group { display: flex; flex-direction: column; }
+        label { font-weight: bold; margin-bottom: 8px; font-size: 0.9em; }
+        input[type="range"] { cursor: pointer; }
+        .value-display { font-weight: normal; color: #666; margin-left: 5px; }
+        
+        .vis-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+        }
+        svg {
+            background: white;
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+        .label-text { font-size: 12px; fill: #666; }
+        .axis { stroke: #ccc; stroke-width: 1; }
+        .path-spiral { stroke: #2980b9; stroke-width: 2; fill: none; }
+        .path-wave { stroke: #c0392b; stroke-width: 2; fill: none; }
+        .envelope { stroke: #95a5a6; stroke-width: 1; stroke-dasharray: 4; fill: none; }
+        
+        .info-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #eef2f7;
+            border-left: 5px solid #3498db;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Interaktives Federpendel</h1>
+    <p style="text-align: center; color: #7f8c8d;">Analyse der Dämpfung & Kreisprojektion (3 Perioden)</p>
+
+    <div class="controls">
+        <div class="control-group">
+            <label>Startamplitude A₀: <span id="v-a0" class="value-display">100</span></label>
+            <input type="range" id="a0" min="50" max="150" value="100">
+        </div>
+        <div class="control-group">
+            <label>Dämpfung δ: <span id="v-delta" class="value-display">0.2</span></label>
+            <input type="range" id="delta" min="0.05" max="0.6" step="0.01" value="0.2">
+        </div>
+        <div class="control-group">
+            <label>Kreisfrequenz ω: <span id="v-omega" class="value-display">1.0</span></label>
+            <input type="range" id="omega" min="0.5" max="2.0" step="0.1" value="1.0">
+        </div>
+    </div>
+
+    <div class="vis-area">
+        <div>
+            <h3 style="text-align: center; font-size: 1em;">Kreisprojektion (Spirale)</h3>
+            <svg id="svg-spiral" width="400" height="400" viewBox="0 0 400 400">
+                <line x1="0" y1="200" x2="400" y2="200" class="axis" />
+                <line x1="200" y1="0" x2="200" y2="400" class="axis" />
+                <path id="spiral-path" class="path-spiral" />
+                <circle id="spiral-end" r="4" fill="#2980b9" />
+            </svg>
+        </div>
+
+        <div>
+            <h3 style="text-align: center; font-size: 1em;">Weg-Zeit-Diagramm</h3>
+            <svg id="svg-wave" width="600" height="250" viewBox="0 0 600 250">
+                <line x1="50" y1="125" x2="550" y2="125" class="axis" />
+                <line x1="50" y1="20" x2="50" y2="230" class="axis" />
+                <text x="560" y="130" class="label-text">t</text>
+                <text x="30" y="30" class="label-text">y(t)</text>
+                
+                <path id="envelope-up" class="envelope" />
+                <path id="envelope-down" class="envelope" />
+                <path id="wave-path" class="path-wave" />
+            </svg>
+        </div>
+    </div>
+
+    <div class="info-box">
+        <strong>Physikalischer Hintergrund:</strong><br>
+        Die Gleichung der gedämpften Schwingung lautet: <em>y(t) = A₀ · e<sup>-δt</sup> · cos(ωt)</em>. 
+        In der Kreisprojektion führt die Abnahme der Amplitude dazu, dass der Radius ständig kleiner wird, wodurch eine <strong>Spirale</strong> entsteht, die im Ursprung (0,0) endet.
+    </div>
+</div>
+
+<script>
+    const a0Input = document.getElementById('a0');
+    const deltaInput = document.getElementById('delta');
+    const omegaInput = document.getElementById('omega');
+
+    const vA0 = document.getElementById('v-a0');
+    const vDelta = document.getElementById('v-delta');
+    const vOmega = document.getElementById('v-omega');
+
+    const spiralPath = document.getElementById('spiral-path');
+    const spiralEnd = document.getElementById('spiral-end');
+    const wavePath = document.getElementById('wave-path');
+    const envUp = document.getElementById('envelope-up');
+    const envDown = document.getElementById('envelope-down');
+
+    function update() {
+        const A0 = parseFloat(a0Input.value);
+        const delta = parseFloat(deltaInput.value);
+        const omega = parseFloat(omegaInput.value);
+
+        vA0.textContent = A0;
+        vDelta.textContent = delta.toFixed(2);
+        vOmega.textContent = omega.toFixed(1);
+
+        // Wir wollen genau 3 volle Schwingungen: t geht von 0 bis 3 * Periode
+        // Periode T = 2*PI / omega
+        const T = (2 * Math.PI) / omega;
+        const duration = 3 * T;
+        const steps = 300;
+
+        let spiralD = "";
+        let waveD = "";
+        let envUpD = "";
+        let envDownD = "";
+
+        for (let i = 0; i <= steps; i++) {
+            const t = (i / steps) * duration;
+            const amplitude = A0 * Math.exp(-delta * t);
+            
+            // Spirale Koordinaten (Zentrum bei 200, 200)
+            const x_spiral = 200 + amplitude * Math.cos(omega * t);
+            const y_spiral = 200 - amplitude * Math.sin(omega * t); 
+            
+            if (i === 0) {
+                spiralD += `M ${x_spiral} ${y_spiral}`;
+            } else {
+                spiralD += ` L ${x_spiral} ${y_spiral}`;
+            }
+
+            // Welle Koordinaten (Start bei x=50, Zentrum y=125)
+            const x_wave = 50 + (i / steps) * 500;
+            const y_wave = 125 - amplitude * Math.cos(omega * t);
+            
+            if (i === 0) {
+                waveD += `M ${x_wave} ${y_wave}`;
+                envUpD += `M ${x_wave} ${125 - amplitude}`;
+                envDownD += `M ${x_wave} ${125 + amplitude}`;
+            } else {
+                waveD += ` L ${x_wave} ${y_wave}`;
+                envUpD += ` L ${x_wave} ${125 - amplitude}`;
+                envDownD += ` L ${x_wave} ${125 + amplitude}`;
+            }
+
+            // Endpunkt setzen
+            if (i === steps) {
+                spiralEnd.setAttribute('cx', x_spiral);
+                spiralEnd.setAttribute('cy', y_spiral);
+            }
+        }
+
+        spiralPath.setAttribute('d', spiralD);
+        wavePath.setAttribute('d', waveD);
+        envUp.setAttribute('d', envUpD);
+        envDown.setAttribute('d', envDownD);
+    }
+
+    [a0Input, deltaInput, omegaInput].forEach(input => {
+        input.addEventListener('input', update);
+    });
+
+    // Initiales Zeichnen
+    update();
+</script>
+
+</body>
+</html>
